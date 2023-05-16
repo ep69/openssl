@@ -2,27 +2,31 @@ name: Interoperability tests with GnuTLS and NSS
 on: [pull_request, push]
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 90
     strategy:
-      fail-fast: false # Setting fail-fast to false prevents GitHub from cancelling all in-progress jobs if any matrix job fails.
+      fail-fast: false
       matrix:
         COMPONENT: [openssl-upstream-gnutls, openssl-upstream-nss]
     env:
       COMPONENT: ${{ matrix.COMPONENT }}
     # Code below inspired by https://fedoramagazine.org/github-actions-use-podman-to-run-fedora-linux/
     steps:
-      - name: Setup Podman
+      - name: Setup Docker
+        # Docker installation intructions https://docs.docker.com/engine/install/ubuntu/
         run: |
-          sudo apt -y update
-          sudo apt-get -y install podman
-          echo "podman version"
-          podman version
-          podman pull registry.fedoraproject.org/fedora:latest
-      # - name: Get source
-      #   uses: actions/checkout@v3
-      #   with:
-      #     submodules: true
+          sudo apt-get -y install ca-certificates curl gnupg
+          sudo install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          sudo chmod a+r /etc/apt/keyrings/docker.gpg
+          echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+          "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+          sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt-get -y update
+          sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+          echo "Docker version"
+          docker version
+          docker pull registry.fedoraproject.org/fedora:latest
       - name: Create container
         run: |
           {
@@ -33,18 +37,19 @@ jobs:
               echo 'RUN dnf -y remove openssl'
               echo 'RUN mkdir /root/bin'
               echo "RUN echo '#!/bin/bash /openssl/util/wrap.pl /openssl/apps/openssl' > /root/bin/openssl & chmod +x /root/bin/openssl"
-              echo 'RUN git clone -b interop-plans --recurse-submodules https://github.com/not4pedro/openssl.git'
+              echo 'RUN git clone -b interop-plans https://github.com/not4pedro/openssl.git'
               echo 'WORKDIR /openssl/'
-              echo 'RUN ./config --banner=Configured no-asm no-makedepend enable-buildtest-c++ enable-fips --strict-warnings -D_DEFAULT_SOURCE && perl configdata.pm --dump'
+              echo 'RUN  git submodule update --init interop'
+              echo 'RUN ./config --banner=Configured no-asm no-makedepend enable-fips --strict-warnings && perl configdata.pm --dump'
               echo 'RUN make -s -j4'
               echo 'WORKDIR /openssl/interop'
-              } > podmanfile
-              podman build --tag fedoralatest -f ./podmanfile
+          } > containerfile
+          docker build --tag fedoralatest -f ./containerfile .
       - name : Run tests
         run: |
-          podman run -di --name fedoralatest fedoralatest:latest
+          docker run -di --name fedoralatest fedoralatest:latest
           echo "Tests to run:"
-          podman exec -i fedoralatest tmt run plans -n $COMPONENT  discover -v
+          docker exec -i fedoralatest tmt run plans -n $COMPONENT  discover -v
           echo "Run the tests:"
-          podman exec -i fedoralatest tmt run -a plans -n $COMPONENT provision -h local execute -h tmt --interactive
+          docker exec -i fedoralatest tmt run -a plans -n $COMPONENT provision -h local execute -h tmt --interactive
           echo "Finished - important to prevent truncating of the full output"
