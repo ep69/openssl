@@ -34,6 +34,7 @@ jobs:
               echo 'RUN dnf -y update'
               echo 'RUN dnf -y install perl'
               echo 'RUN dnf -y install git tmt-all'
+              echo 'RUN dnf -y install iputils nmap'
               echo 'RUN dnf -y remove openssl'
               echo 'RUN mkdir /root/bin'
               echo "RUN echo '#!/bin/bash /openssl/util/wrap.pl /openssl/apps/openssl' > /root/bin/openssl & chmod +x /root/bin/openssl"
@@ -48,6 +49,8 @@ jobs:
       - name : Run tests
         run: |
           docker run -di --name fedoralatest fedoralatest:latest
+          echo "Gather info:"
+          docker exec -i fedoralatest cat /etc/hosts
           echo "Tests to run:"
           docker exec -i fedoralatest tmt run plans -n $COMPONENT  discover -v
           echo "Run the tests:"
