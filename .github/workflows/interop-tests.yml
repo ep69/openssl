@@ -48,7 +48,7 @@ jobs:
           docker build --tag fedoralatest -f ./containerfile .
       - name : Run tests
         run: |
-          docker run -di --name fedoralatest fedoralatest:latest
+          docker run --sysctl net.ipv6.conf.lo.disable_ipv6=0 -di --name fedoralatest fedoralatest:latest
           echo "Gather info:"
           docker exec -i fedoralatest cat /etc/hosts
           echo "Tests to run:"
