@@ -31,7 +31,7 @@ jobs:
       - name: install interop tests
         run: |
           cd ${GITHUB_WORKSPACE}
-          git clone --branch=openssl-new --depth=1 https://gitlab.com/redhat-crypto/tests/interop.git
+          git clone --branch=openssl-v0.1 --depth=1 https://gitlab.com/redhat-crypto/tests/interop.git
       - name: build openssl as an rpm
         run: |
           mkdir -p /build/SPECS && cd /build && echo -e "%_topdir /build\n%_lto_cflags %{nil}" >~/.rpmmacros && rpmdev-setuptree
